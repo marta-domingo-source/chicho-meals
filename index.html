@@ -98,9 +98,9 @@
   /* ---------- full-screen menu ---------- */
   .menu{
     position:fixed;inset:0;z-index:40;
-    display:flex;align-items:center;
-    padding:calc(28px + env(safe-area-inset-top)) 26px
-            calc(150px + env(safe-area-inset-bottom));
+    display:flex;align-items:flex-end;justify-content:flex-start;
+    padding:calc(28px + env(safe-area-inset-top)) 22px
+            calc(30px + env(safe-area-inset-bottom));
     background:color-mix(in srgb, var(--bg) 72%, transparent);
     -webkit-backdrop-filter:blur(18px) saturate(120%);
     backdrop-filter:blur(18px) saturate(120%);
@@ -117,8 +117,8 @@
   }
 
   .menu-items{
-    display:flex;flex-direction:column;align-items:flex-start;gap:6px;width:100%;
-    transform-origin:var(--origin-x, 50%) var(--origin-y, 100%);
+    display:flex;flex-direction:column;align-items:flex-start;gap:6px;
+    transform-origin:var(--origin-x, 0%) var(--origin-y, 100%);
     transform:scale(.94);
     transition:transform .15s ease;
   }
@@ -351,10 +351,10 @@
 
 <div class="menu" id="menu" role="dialog" aria-modal="true" aria-label="Sections">
   <nav class="menu-items">
-    <button class="menu-item" data-view="plan"    style="--i:0">Today<span class="dot"></span></button>
-    <button class="menu-item" data-view="grocery" style="--i:1">Groceries<span class="dot"></span></button>
-    <button class="menu-item" data-view="variety" style="--i:2">Variety<span class="dot"></span></button>
-    <button class="menu-item" data-view="create"  style="--i:3">Create<span class="dot"></span></button>
+    <button class="menu-item" data-view="plan"    style="--i:3">Today<span class="dot"></span></button>
+    <button class="menu-item" data-view="grocery" style="--i:2">Groceries<span class="dot"></span></button>
+    <button class="menu-item" data-view="variety" style="--i:1">Variety<span class="dot"></span></button>
+    <button class="menu-item" data-view="create"  style="--i:0">Create<span class="dot"></span></button>
   </nav>
 </div>
 
@@ -1469,7 +1469,7 @@ function clampMascot(x, y){
 
 function defaultMascotPos(){
   const {w, h} = mascotSize();
-  return { x: window.innerWidth - w - 12, y: window.innerHeight - h - 24 };
+  return { x: window.innerWidth - w - 14, y: window.innerHeight - h - 14 };
 }
 
 function placeMascot(pos, persist){
