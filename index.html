@@ -79,21 +79,36 @@
     margin-bottom:12px;
   }
   .daytabs{
-    display:flex;overflow-x:auto;gap:6px;padding:10px 14px 4px;
+    display:flex;overflow-x:auto;gap:2px;padding:4px 12px 2px;
     -webkit-overflow-scrolling:touch;
     scrollbar-width:none;
   }
   .daytabs::-webkit-scrollbar{display:none;}
   .daytab{
-    flex:0 0 auto;
-    padding:8px 14px;
-    border-radius:999px;
-    background:var(--card);
-    border:1px solid var(--line);
-    font-size:13px;font-weight:600;color:var(--muted);
-    white-space:nowrap;
+    position:relative;flex:0 0 auto;
+    width:88px;height:88px;padding:0;border:none;background:none;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    line-height:1;color:var(--muted);
   }
-  .daytab.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
+  /* The circle and the burst are both 48-point polygons — same point count, so
+     clip-path can actually interpolate and the shape spikes out on selection. */
+  .daytab::before{
+    content:"";position:absolute;inset:0;
+    background:var(--card);
+    clip-path:polygon(50.0% 12.5%,54.9% 12.8%,59.7% 13.8%,64.4% 15.4%,68.8% 17.5%,72.8% 20.2%,76.5% 23.5%,79.8% 27.2%,82.5% 31.3%,84.6% 35.6%,86.2% 40.3%,87.2% 45.1%,87.5% 50.0%,87.2% 54.9%,86.2% 59.7%,84.6% 64.4%,82.5% 68.8%,79.8% 72.8%,76.5% 76.5%,72.8% 79.8%,68.8% 82.5%,64.4% 84.6%,59.7% 86.2%,54.9% 87.2%,50.0% 87.5%,45.1% 87.2%,40.3% 86.2%,35.6% 84.6%,31.3% 82.5%,27.2% 79.8%,23.5% 76.5%,20.2% 72.8%,17.5% 68.8%,15.4% 64.4%,13.8% 59.7%,12.8% 54.9%,12.5% 50.0%,12.8% 45.1%,13.8% 40.3%,15.4% 35.6%,17.5% 31.2%,20.2% 27.2%,23.5% 23.5%,27.2% 20.2%,31.2% 17.5%,35.6% 15.4%,40.3% 13.8%,45.1% 12.8%);
+    transition:clip-path .3s cubic-bezier(.34,1.4,.5,1), background .2s ease;
+  }
+  .daytab.active::before{
+    background:var(--accent);
+    clip-path:polygon(50.0% 0.0%,54.9% 12.8%,62.9% 1.7%,64.4% 15.4%,75.0% 6.7%,72.8% 20.2%,85.4% 14.6%,79.8% 27.2%,93.3% 25.0%,84.6% 35.6%,98.3% 37.1%,87.2% 45.1%,100.0% 50.0%,87.2% 54.9%,98.3% 62.9%,84.6% 64.4%,93.3% 75.0%,79.8% 72.8%,85.4% 85.4%,72.8% 79.8%,75.0% 93.3%,64.4% 84.6%,62.9% 98.3%,54.9% 87.2%,50.0% 100.0%,45.1% 87.2%,37.1% 98.3%,35.6% 84.6%,25.0% 93.3%,27.2% 79.8%,14.6% 85.4%,20.2% 72.8%,6.7% 75.0%,15.4% 64.4%,1.7% 62.9%,12.8% 54.9%,0.0% 50.0%,12.8% 45.1%,1.7% 37.1%,15.4% 35.6%,6.7% 25.0%,20.2% 27.2%,14.6% 14.6%,27.2% 20.2%,25.0% 6.7%,35.6% 15.4%,37.1% 1.7%,45.1% 12.8%);
+  }
+  .daytab > span{position:relative;}
+  .daytab .dn{font-size:12.5px;font-weight:600;text-transform:lowercase;}
+  .daytab .dd{font-size:17px;font-weight:700;margin-top:3px;}
+  .daytab.active{color:var(--accent-ink);}
+  @media (prefers-reduced-motion: reduce){
+    .daytab::before{transition:background .2s ease;}
+  }
 
   /* ---------- full-screen menu ---------- */
   .menu{
@@ -725,7 +740,11 @@ function renderDayTabs(){
   dayDisplayOrder().forEach(i=>{
     const b = document.createElement("button");
     b.className = "daytab" + (i===currentDay?" active":"");
-    b.textContent = state.plan.days[i].name;
+    const d = dateForDay(i);
+    b.innerHTML = `<span class="dn">${state.plan.days[i].name.slice(0,3)}</span>`
+                + `<span class="dd">${d.getDate()}</span>`;
+    b.setAttribute("aria-label", formatDate(d));   // "sun 2" is no use to a screen reader
+    if(i===currentDay) b.setAttribute("aria-current","date");
     b.onclick = ()=>{ currentDay=i; renderDayTabs(); renderDayContent(); };
     wrap.appendChild(b);
   });
