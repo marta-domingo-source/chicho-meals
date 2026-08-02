@@ -23,6 +23,8 @@
     --line:#e1dcd4;
     --accent:#736659;
     --accent-ink:#ffffff;
+    --mascot:#e3bc00;      /* Chicho's body yellow, sampled from the artwork.
+                              Dark ink on it is 7.24:1; white would be 1.83:1. */
     --good:#748a72;
     --good-bg:#eaede7;
     --warn:#a5814f;
@@ -99,15 +101,19 @@
     transition:clip-path .3s cubic-bezier(.34,1.4,.5,1), background .2s ease;
   }
   .daytab.active::before{
-    background:var(--accent);
+    background:var(--mascot);
     clip-path:polygon(50.0% 0.0%,54.9% 12.8%,62.9% 1.7%,64.4% 15.4%,75.0% 6.7%,72.8% 20.2%,85.4% 14.6%,79.8% 27.2%,93.3% 25.0%,84.6% 35.6%,98.3% 37.1%,87.2% 45.1%,100.0% 50.0%,87.2% 54.9%,98.3% 62.9%,84.6% 64.4%,93.3% 75.0%,79.8% 72.8%,85.4% 85.4%,72.8% 79.8%,75.0% 93.3%,64.4% 84.6%,62.9% 98.3%,54.9% 87.2%,50.0% 100.0%,45.1% 87.2%,37.1% 98.3%,35.6% 84.6%,25.0% 93.3%,27.2% 79.8%,14.6% 85.4%,20.2% 72.8%,6.7% 75.0%,15.4% 64.4%,1.7% 62.9%,12.8% 54.9%,0.0% 50.0%,12.8% 45.1%,1.7% 37.1%,15.4% 35.6%,6.7% 25.0%,20.2% 27.2%,14.6% 14.6%,27.2% 20.2%,25.0% 6.7%,35.6% 15.4%,37.1% 1.7%,45.1% 12.8%);
   }
   .daytab > span{position:relative;}
   .daytab .dn{font-size:12.5px;font-weight:600;text-transform:lowercase;}
   .daytab .dd{font-size:17px;font-weight:700;margin-top:3px;}
-  .daytab.active{color:var(--accent-ink);}
+  .daytab.active{color:var(--ink);}
+  /* the burst spins only when the change came from a tap, not on every render */
+  @keyframes daytab-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  .daytab.active.spin::before{animation:daytab-spin .6s cubic-bezier(.3,.9,.3,1);}
   @media (prefers-reduced-motion: reduce){
     .daytab::before{transition:background .2s ease;}
+    .daytab.active.spin::before{animation:none;}
   }
 
   /* ---------- full-screen menu ---------- */
@@ -734,20 +740,23 @@ function dayDisplayOrder(){
   return days.map((_,k)=>(start+k)%days.length);
 }
 
+let spinNextRender = false;   // set by a tap so only that render animates
+
 function renderDayTabs(){
   const wrap = document.getElementById("dayTabs");
   wrap.innerHTML = "";
   dayDisplayOrder().forEach(i=>{
     const b = document.createElement("button");
-    b.className = "daytab" + (i===currentDay?" active":"");
+    b.className = "daytab" + (i===currentDay ? " active" + (spinNextRender?" spin":"") : "");
     const d = dateForDay(i);
     b.innerHTML = `<span class="dn">${state.plan.days[i].name.slice(0,3)}</span>`
                 + `<span class="dd">${d.getDate()}</span>`;
     b.setAttribute("aria-label", formatDate(d));   // "sun 2" is no use to a screen reader
     if(i===currentDay) b.setAttribute("aria-current","date");
-    b.onclick = ()=>{ currentDay=i; renderDayTabs(); renderDayContent(); };
+    b.onclick = ()=>{ spinNextRender = true; currentDay=i; renderDayTabs(); renderDayContent(); };
     wrap.appendChild(b);
   });
+  spinNextRender = false;
   wrap.scrollLeft = 0;
 }
 
