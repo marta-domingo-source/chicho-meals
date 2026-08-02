@@ -402,16 +402,26 @@ function switchView(name){
 }
 
 /* ---------- PLAN RENDER ---------- */
+/* Plan days stay in their canonical Mon–Sun order (grocery badges depend on it);
+   only the tab strip is rotated so today leads. */
+function dayDisplayOrder(){
+  const days = state.plan.days;
+  const start = days.findIndex(d=>d.name===DAY_ORDER[new Date().getDay()]);
+  if(start < 0) return days.map((_,i)=>i);   // custom plan with no matching day name
+  return days.map((_,k)=>(start+k)%days.length);
+}
+
 function renderDayTabs(){
   const wrap = document.getElementById("dayTabs");
   wrap.innerHTML = "";
-  state.plan.days.forEach((d,i)=>{
+  dayDisplayOrder().forEach(i=>{
     const b = document.createElement("button");
     b.className = "daytab" + (i===currentDay?" active":"");
-    b.textContent = d.name;
+    b.textContent = state.plan.days[i].name;
     b.onclick = ()=>{ currentDay=i; renderDayTabs(); renderDayContent(); };
     wrap.appendChild(b);
   });
+  wrap.scrollLeft = 0;
 }
 
 function renderDayContent(){
@@ -842,11 +852,7 @@ function formatToday(){
   return DAY_ORDER[d.getDay()] + ", " + months[d.getMonth()] + " " + d.getDate();
 }
 
-(function selectTodayTab(){
-  const todayName = DAY_ORDER[new Date().getDay()];
-  const idx = state.plan.days.findIndex(d=>d.name===todayName);
-  if(idx>=0) currentDay = idx;
-})();
+currentDay = dayDisplayOrder()[0];
 
 renderDayTabs();
 renderDayContent();
