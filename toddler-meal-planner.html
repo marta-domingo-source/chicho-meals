@@ -251,6 +251,13 @@ const CATS = {
   fat:       { label:"Healthy Fats",      color:"var(--fat)"      }
 };
 
+const DAY_ORDER = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const GROCERY_FILTERS = [
+  {key:"week",  label:"Whole week"},
+  {key:"today", label:"Today"},
+  {key:"next3", label:"Next 3 days"}
+];
+
 /* ---------- default variety checklist (master foods per category) ---------- */
 const DEFAULT_VARIETY = {
   protein:   ["Egg","Chicken","Turkey","Beef","Salmon","White fish","Lentils","Chickpeas","Tofu","Greek yogurt","Cottage cheese","Ricotta","Cheese"],
@@ -324,14 +331,12 @@ function defaultPlan(){
 
 /* ---------- state ---------- */
 const STORE_KEY = "toddlerMealPlanner.v1";
+const SCHEMA_VERSION = 3;
 let state = loadState();
 
-function loadState(){
-  const raw = localStorage.getItem(STORE_KEY);
-  if(raw){
-    try{ return JSON.parse(raw); }catch(e){}
-  }
+function freshState(){
   return {
+    schemaVersion: SCHEMA_VERSION,
     plan: defaultPlan(),
     variety: JSON.parse(JSON.stringify(DEFAULT_VARIETY)),
     manualCovered: {},   // { "protein::Salmon": true }
@@ -341,10 +346,45 @@ function loadState(){
     weekStarted: new Date().toISOString().slice(0,10)
   };
 }
-function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
-if(!state.groceryFilter) state.groceryFilter = "week";
 
-if(!state.grocery || state.grocery.length===0){ rebuildGrocery(false); }
+function loadState(){
+  const raw = localStorage.getItem(STORE_KEY);
+  if(!raw) return freshState();
+  let saved;
+  try{ saved = JSON.parse(raw); }catch(e){ return freshState(); }
+  return migrate(saved);
+}
+
+/* Saved states predate later features, so fill in anything the running code
+   expects but an older save never wrote. Saved values always win. */
+function migrate(saved){
+  const s = Object.assign(freshState(), saved);
+
+  if(!s.plan || !Array.isArray(s.plan.days) || s.plan.days.length===0) s.plan = defaultPlan();
+
+  // keep only categories this build knows about, and add any it's missing
+  const variety = {};
+  Object.keys(DEFAULT_VARIETY).forEach(cat=>{
+    const foods = s.variety && Array.isArray(s.variety[cat]) ? s.variety[cat] : null;
+    variety[cat] = foods ? foods.slice() : DEFAULT_VARIETY[cat].slice();
+  });
+  s.variety = variety;
+
+  if(!s.manualCovered || typeof s.manualCovered!=="object") s.manualCovered = {};
+  if(!Array.isArray(s.history)) s.history = [];
+  if(!Array.isArray(s.grocery)) s.grocery = [];
+  if(!GROCERY_FILTERS.some(f=>f.key===s.groceryFilter)) s.groceryFilter = "week";
+
+  s.schemaVersion = SCHEMA_VERSION;
+  return s;
+}
+
+function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+
+/* Pre-`entries` grocery items can't be day-filtered, so resync them from the plan. */
+if(state.grocery.length===0 || state.grocery.some(g=>!g.manual && !Array.isArray(g.entries))){
+  rebuildGrocery(false);
+}
 
 /* ---------- view switching ---------- */
 let currentDay = 0;
@@ -461,12 +501,6 @@ function rebuildGrocery(userTriggered){
 }
 
 /* ---------- grocery day filtering ---------- */
-const DAY_ORDER = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-const GROCERY_FILTERS = [
-  {key:"week",  label:"Whole week"},
-  {key:"today", label:"Today"},
-  {key:"next3", label:"Next 3 days"}
-];
 function computeAllowedDays(filterKey){
   const todayIdx = new Date().getDay();
   if(filterKey==="today") return new Set([DAY_ORDER[todayIdx]]);
@@ -622,7 +656,7 @@ function renderVariety(){
   const catPct = {};
 
   Object.entries(state.variety).forEach(([cat, foods])=>{
-    const meta = CATS[cat];
+    const meta = CATS[cat] || { label:cat, color:"#ccc" };
     const block = document.createElement("div");
     block.className = "cat-block";
     const coveredCount = foods.filter(f=>isCovered(cat,f)).length;
