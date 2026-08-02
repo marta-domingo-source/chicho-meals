@@ -130,7 +130,9 @@
     background:#fff;color:var(--ink);display:flex;align-items:center;gap:6px;
   }
   .chip.covered{background:var(--good-bg);border-color:var(--good);color:#2f6b45;}
+  .chip.selected{background:var(--accent);border-color:var(--accent);color:#fff;}
   .chip .x{opacity:.35;font-size:12px;}
+  .filter-note{font-size:11.5px;color:var(--muted);margin:6px 0 0;}
 
   .progress-wrap{background:#f1ece3;border-radius:999px;height:9px;overflow:hidden;margin:6px 0 2px;}
   .progress-bar{height:100%;background:var(--good);border-radius:999px;transition:width .3s;}
@@ -147,8 +149,11 @@
   .grocery-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px dashed var(--line);}
   .grocery-row:first-of-type{border-top:none;}
   .grocery-row input[type=checkbox]{width:19px;height:19px;accent-color:var(--good);}
-  .grocery-row label{flex:1;font-size:14.5px;}
+  .grocery-row .rowmain{flex:1;min-width:0;}
+  .grocery-row label{font-size:14.5px;display:block;}
+  .grocery-row .day-badge{font-size:11px;color:var(--muted);display:block;margin-top:1px;}
   .grocery-row.checked label{color:var(--muted);text-decoration:line-through;}
+  .grocery-row.checked .day-badge{text-decoration:line-through;}
   .grocery-row .amt{font-size:12.5px;color:var(--muted);white-space:nowrap;}
 
   .btnrow{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
@@ -189,7 +194,8 @@
   <div class="view" id="view-grocery">
     <div class="card">
       <div class="section-title">🛒 Grocery list for this week</div>
-      <p class="subtle">Auto-added from every meal in your plan. Check items off as you buy them, or add extras below.</p>
+      <p class="subtle">Auto-added from every meal in your plan. Each item shows which day(s) it's needed — filter below to shop for just today or the next few days.</p>
+      <div class="chips" id="groceryFilterChips" style="margin-bottom:12px;"></div>
       <div id="groceryList"></div>
       <div class="add-item-row" style="margin-top:12px;">
         <input class="name" id="extraName" type="text" placeholder="Extra item (e.g. diapers, bread)">
@@ -334,12 +340,14 @@ function loadState(){
     plan: defaultPlan(),
     variety: JSON.parse(JSON.stringify(DEFAULT_VARIETY)),
     manualCovered: {},   // { "protein::Salmon": true }
-    grocery: [],         // [{id,name,qty,cat,checked,manual}]
+    grocery: [],         // [{id,name,qty,cat,checked,manual,entries:[{day,qty}]}]
+    groceryFilter: "week", // "week" | "today" | "next3"
     history: [],
     weekStarted: new Date().toISOString().slice(0,10)
   };
 }
 function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+if(!state.groceryFilter) state.groceryFilter = "week";
 
 if(!state.grocery || state.grocery.length===0){ rebuildGrocery(false); }
 
@@ -425,15 +433,15 @@ function renderDayContent(){
 
 /* ---------- GROCERY ---------- */
 function rebuildGrocery(userTriggered){
-  const totals = {}; // key: name lower -> {name, qty list, cat}
+  const totals = {}; // key: name lower -> {name, cat, entries:[{day,qty}]}
   state.plan.days.forEach(day=>{
     day.meals.forEach(m=>{
       m.items.forEach(item=>{
         const key = item.name.trim().toLowerCase();
         if(!totals[key]){
-          totals[key] = { name:item.name, qtys:[], cat:item.cats[0] };
+          totals[key] = { name:item.name, cat:item.cats[0], entries:[] };
         }
-        if(item.qty) totals[key].qtys.push(item.qty);
+        totals[key].entries.push({ day: day.name, qty: item.qty||"" });
       });
     });
   });
@@ -445,8 +453,9 @@ function rebuildGrocery(userTriggered){
   const list = Object.values(totals).map(t=>({
     id: uid(),
     name: t.name,
-    qty: summarizeQty(t.qtys),
+    qty: summarizeQty(t.entries.map(e=>e.qty)),
     cat: t.cat,
+    entries: t.entries,
     checked: !!prevChecked[t.name.trim().toLowerCase()],
     manual:false
   }));
@@ -454,6 +463,37 @@ function rebuildGrocery(userTriggered){
   state.grocery = list;
   save();
   if(userTriggered) renderGrocery();
+}
+
+/* ---------- grocery day filtering ---------- */
+const DAY_ORDER = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const GROCERY_FILTERS = [
+  {key:"week",  label:"Whole week"},
+  {key:"today", label:"Today"},
+  {key:"next3", label:"Next 3 days"}
+];
+function computeAllowedDays(filterKey){
+  const todayIdx = new Date().getDay();
+  if(filterKey==="today") return new Set([DAY_ORDER[todayIdx]]);
+  if(filterKey==="next3") return new Set([DAY_ORDER[todayIdx], DAY_ORDER[(todayIdx+1)%7], DAY_ORDER[(todayIdx+2)%7]]);
+  return null; // whole week = no filtering
+}
+function renderGroceryFilterChips(){
+  const wrap = document.getElementById("groceryFilterChips");
+  if(!wrap) return;
+  wrap.innerHTML = "";
+  GROCERY_FILTERS.forEach(opt=>{
+    const chip = document.createElement("div");
+    chip.className = "chip" + ((state.groceryFilter||"week")===opt.key ? " selected":"");
+    chip.style.cursor = "pointer";
+    chip.textContent = opt.label;
+    chip.addEventListener("click", ()=>{
+      state.groceryFilter = opt.key;
+      save();
+      renderGrocery();
+    });
+    wrap.appendChild(chip);
+  });
 }
 
 function summarizeQty(qtys){
@@ -489,13 +529,25 @@ function uncheckAllGrocery(){
 }
 
 function renderGrocery(){
+  renderGroceryFilterChips();
+  const filterKey = state.groceryFilter || "week";
+  const allowed = computeAllowedDays(filterKey);
+
   const wrap = document.getElementById("groceryList");
   wrap.innerHTML = "";
   const groups = {};
+  let visibleCount = 0;
+
   state.grocery.forEach(g=>{
+    const entries = g.entries || [];
+    // manual extras (no entries / not tied to a day) always show, regardless of filter
+    const matchingEntries = allowed ? entries.filter(e=>allowed.has(e.day)) : entries;
+    if(allowed && !g.manual && entries.length && matchingEntries.length===0) return; // not needed in this window
     const key = g.cat || "other";
-    (groups[key] = groups[key]||[]).push(g);
+    (groups[key] = groups[key]||[]).push({ g, matchingEntries });
+    visibleCount++;
   });
+
   const order = ["protein","vegetable","fruit","grain","fat","other"];
   const labels = {...Object.fromEntries(Object.entries(CATS).map(([k,v])=>[k,v.label])), other:"Other"};
 
@@ -504,13 +556,21 @@ function renderGrocery(){
     const cb = document.createElement("div");
     cb.className = "grocery-cat";
     cb.innerHTML = `<h3>${labels[key]}</h3>`;
-    groups[key].sort((a,b)=>a.name.localeCompare(b.name)).forEach(g=>{
+    groups[key].sort((a,b)=>a.g.name.localeCompare(b.g.name)).forEach(({g, matchingEntries})=>{
       const row = document.createElement("div");
       row.className = "grocery-row" + (g.checked?" checked":"");
+      const allDays = g.entries ? [...new Set(g.entries.map(e=>e.day))] : [];
+      const dayBadge = allDays.length ? allDays.map(d=>d.slice(0,3)).join(" · ") : "";
+      const displayQty = (allowed && g.entries && g.entries.length)
+        ? summarizeQty(matchingEntries.map(e=>e.qty))
+        : (g.qty||"");
       row.innerHTML = `
         <input type="checkbox" ${g.checked?"checked":""} data-id="${g.id}">
-        <label>${g.name}</label>
-        <span class="amt">${g.qty||""}</span>
+        <div class="rowmain">
+          <label>${g.name}</label>
+          ${dayBadge? `<span class="day-badge">${dayBadge}</span>` : ""}
+        </div>
+        <span class="amt">${displayQty}</span>
         <button class="icon-btn" data-del="${g.id}">✕</button>`;
       row.querySelector("input").addEventListener("change", e=>{
         g.checked = e.target.checked; save(); renderGrocery();
@@ -523,8 +583,11 @@ function renderGrocery(){
     });
     wrap.appendChild(cb);
   });
+
   if(state.grocery.length===0){
     wrap.innerHTML = `<p class="empty">No items yet — add foods to your meal plan first.</p>`;
+  } else if(visibleCount===0){
+    wrap.innerHTML = `<p class="empty">Nothing needed in this window — try "Whole week".</p>`;
   }
 }
 
