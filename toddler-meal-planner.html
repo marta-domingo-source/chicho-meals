@@ -167,6 +167,21 @@
   .history-row:first-of-type{border-top:none;}
 
   .empty{font-size:13px;color:var(--muted);text-align:center;padding:18px 0;}
+  .addform{margin-top:8px;}
+  .add-toggle{
+    width:100%;background:none;border:1px dashed var(--line);border-radius:10px;
+    padding:9px 12px;font-size:13px;font-weight:600;color:var(--muted);text-align:center;
+  }
+  .addform-open{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fbf9f6;}
+  .addform-open input, .addform-open select{
+    border:1px solid var(--line);border-radius:9px;padding:9px 10px;
+    font-size:13.5px;background:#fff;color:var(--ink);
+  }
+  .addform-open input.full{width:100%;}
+  .addform-row{display:flex;gap:6px;margin-top:6px;}
+  .addform-row input, .addform-row select{flex:1 1 0;min-width:0;}
+  .addform-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px;}
+
   .preview-stats{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--muted);}
   .preview-stats strong{color:var(--ink);font-size:14px;}
   .preview-line{display:flex;gap:8px;padding:4px 0;border-top:1px dashed var(--line);font-size:13px;}
@@ -200,11 +215,7 @@
       <p class="subtle">Auto-added from every meal in your plan. Each item shows which day(s) it's needed — filter below to shop for just today or the next few days.</p>
       <div class="chips" id="groceryFilterChips" style="margin-bottom:12px;"></div>
       <div id="groceryList"></div>
-      <div class="add-item-row" style="margin-top:12px;">
-        <input class="name" id="extraName" type="text" placeholder="Extra item (e.g. diapers, bread)">
-        <input class="qty" id="extraQty" type="text" placeholder="qty">
-        <button onclick="addExtraGrocery()">Add</button>
-      </div>
+      <div id="groceryAdd"></div>
       <div class="btnrow">
         <button class="btn" onclick="uncheckAllGrocery()">Uncheck all</button>
         <button class="btn" onclick="rebuildGrocery(true)">Rebuild from plan</button>
@@ -519,6 +530,100 @@ if(state.grocery.length===0 || state.grocery.some(g=>!g.manual && !Array.isArray
   rebuildGrocery(false);
 }
 
+/* ---------- collapsible add form ----------
+   One "+ Add" button that expands into its fields. Open state and typed values
+   are held per form key so an unrelated re-render (ticking a checkbox, say)
+   doesn't close the form or wipe what you've typed. */
+const addForms = {};   // key -> {open, values}
+
+function addFormState(key){
+  return addForms[key] || (addForms[key] = {open:false, values:{}});
+}
+
+/* fields: [{name, type:"text"|"select", placeholder, full, options:[[value,label]]}] */
+function addForm(key, opts){
+  const st = addFormState(key);
+  const wrap = document.createElement("div");
+  wrap.className = "addform";
+
+  if(!st.open){
+    const toggle = document.createElement("button");
+    toggle.className = "add-toggle";
+    toggle.textContent = "＋ " + opts.label;
+    toggle.addEventListener("click", ()=>{ st.open = true; opts.rerender(); });
+    wrap.appendChild(toggle);
+    return wrap;
+  }
+
+  const form = document.createElement("div");
+  form.className = "addform-open";
+  const inputs = {};
+
+  const full = opts.fields.filter(f=>f.full);
+  const rest = opts.fields.filter(f=>!f.full);
+
+  function build(field){
+    let el;
+    if(field.type==="select"){
+      el = document.createElement("select");
+      field.options.forEach(([v,label])=>{
+        const o = document.createElement("option");
+        o.value = v; o.textContent = label;
+        el.appendChild(o);
+      });
+      el.value = st.values[field.name] || field.options[0][0];
+    }else{
+      el = document.createElement("input");
+      el.type = "text";
+      el.placeholder = field.placeholder || "";
+      el.value = st.values[field.name] || "";
+      el.addEventListener("keydown", e=>{ if(e.key==="Enter") submit(); });
+    }
+    if(field.full) el.className = "full";
+    el.addEventListener("input", ()=>{ st.values[field.name] = el.value; });
+    el.addEventListener("change", ()=>{ st.values[field.name] = el.value; });
+    inputs[field.name] = el;
+    return el;
+  }
+
+  full.forEach(f=>form.appendChild(build(f)));
+  if(rest.length){
+    const row = document.createElement("div");
+    row.className = "addform-row";
+    rest.forEach(f=>row.appendChild(build(f)));
+    form.appendChild(row);
+  }
+
+  function close(){ st.open = false; st.values = {}; }
+
+  function submit(){
+    const values = {};
+    Object.entries(inputs).forEach(([k,el])=>{ values[k] = el.value.trim(); });
+    if(opts.onSubmit(values) === false) return;   // validation failed, stay open
+    close();
+    opts.rerender();
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "addform-actions";
+  const cancel = document.createElement("button");
+  cancel.className = "btn";
+  cancel.textContent = "Cancel";
+  cancel.addEventListener("click", ()=>{ close(); opts.rerender(); });
+  const add = document.createElement("button");
+  add.className = "btn primary";
+  add.textContent = "Add";
+  add.addEventListener("click", submit);
+  actions.appendChild(cancel); actions.appendChild(add);
+  form.appendChild(actions);
+
+  wrap.appendChild(form);
+  setTimeout(()=>{ const first = form.querySelector("input"); if(first) first.focus(); }, 0);
+  return wrap;
+}
+
+const CAT_OPTIONS = Object.entries(CATS).map(([k,v])=>[k, v.label]);
+
 /* ---------- view switching ---------- */
 let currentDay = 0;
 function switchView(name){
@@ -604,24 +709,20 @@ function renderDayContent(){
       block.appendChild(row);
     });
 
-    const addRow = document.createElement("div");
-    addRow.className = "add-item-row";
-    const catOptions = Object.entries(CATS).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join("");
-    addRow.innerHTML = `
-      <input class="name" type="text" placeholder="Food name">
-      <input class="qty" type="text" placeholder="qty (e.g. 50 g)">
-      <select>${catOptions}</select>
-      <button>Add</button>`;
-    const nameInp = addRow.querySelector(".name");
-    const qtyInp = addRow.querySelector(".qty");
-    const catSel = addRow.querySelector("select");
-    addRow.querySelector("button").addEventListener("click", ()=>{
-      const name = nameInp.value.trim();
-      if(!name) return;
-      m.items.push(it(name, qtyInp.value.trim(), [catSel.value]));
-      save(); renderDayContent();
-    });
-    block.appendChild(addRow);
+    block.appendChild(addForm(`meal:${currentDay}:${mi}`, {
+      label: "Add food",
+      rerender: renderDayContent,
+      fields: [
+        {name:"name", type:"text",   placeholder:"Food name", full:true},
+        {name:"qty",  type:"text",   placeholder:"qty (e.g. 50 g)"},
+        {name:"cat",  type:"select", options:CAT_OPTIONS}
+      ],
+      onSubmit: v=>{
+        if(!v.name) return false;
+        m.items.push(it(v.name, v.qty, [v.cat]));
+        save();
+      }
+    }));
     wrap.appendChild(block);
   });
 }
@@ -702,14 +803,22 @@ function summarizeQty(qtys){
   return qtys.length + "x (" + qtys.join(" + ") + ")";
 }
 
-function addExtraGrocery(){
-  const name = document.getElementById("extraName").value.trim();
-  const qty = document.getElementById("extraQty").value.trim();
-  if(!name) return;
-  state.grocery.push({id:uid(), name, qty, cat:"other", checked:false, manual:true});
-  document.getElementById("extraName").value="";
-  document.getElementById("extraQty").value="";
-  save(); renderGrocery();
+function renderGroceryAdd(){
+  const wrap = document.getElementById("groceryAdd");
+  wrap.innerHTML = "";
+  wrap.appendChild(addForm("grocery", {
+    label: "Add extra item",
+    rerender: renderGrocery,
+    fields: [
+      {name:"name", type:"text", placeholder:"Extra item (e.g. diapers, bread)", full:true},
+      {name:"qty",  type:"text", placeholder:"qty"}
+    ],
+    onSubmit: v=>{
+      if(!v.name) return false;
+      state.grocery.push({id:uid(), name:v.name, qty:v.qty, cat:"other", checked:false, manual:true});
+      save();
+    }
+  }));
 }
 
 function uncheckAllGrocery(){
@@ -719,6 +828,7 @@ function uncheckAllGrocery(){
 
 function renderGrocery(){
   renderGroceryFilterChips();
+  renderGroceryAdd();
   const filterKey = state.groceryFilter || "week";
   const allowed = computeAllowedDays(filterKey);
 
@@ -827,11 +937,7 @@ function renderVariety(){
     block.innerHTML = `
       <h3><span class="tag-dot" style="background:${meta.color}"></span>${meta.label} — ${coveredCount}/${foods.length}</h3>
       <div class="progress-wrap"><div class="progress-bar" style="width:${pct}%;background:${meta.color}"></div></div>
-      <div class="chips" style="margin-top:8px;"></div>
-      <div class="add-item-row" style="margin-top:8px;">
-        <input class="name" type="text" placeholder="Add food to ${meta.label.toLowerCase()} checklist">
-        <button>Add</button>
-      </div>`;
+      <div class="chips" style="margin-top:8px;"></div>`;
     const chips = block.querySelector(".chips");
     foods.forEach(food=>{
       const covered = isCovered(cat, food);
@@ -850,17 +956,20 @@ function renderVariety(){
       });
       chips.appendChild(chip);
     });
-    const addRow = block.querySelector(".add-item-row");
-    const nameInp = addRow.querySelector(".name");
-    addRow.querySelector("button").addEventListener("click", ()=>{
-      const v = nameInp.value.trim();
-      if(!v) return;
-      if(!state.variety[cat].some(f=>f.toLowerCase()===v.toLowerCase())){
-        state.variety[cat].push(v);
-        save(); renderVariety();
+    block.appendChild(addForm("variety:"+cat, {
+      label: "Add to " + meta.label.toLowerCase(),
+      rerender: renderVariety,
+      fields: [
+        {name:"name", type:"text", placeholder:`Food to add to ${meta.label.toLowerCase()}`, full:true}
+      ],
+      onSubmit: v=>{
+        if(!v.name) return false;
+        if(!state.variety[cat].some(f=>f.toLowerCase()===v.name.toLowerCase())){
+          state.variety[cat].push(v.name);
+          save();
+        }
       }
-      nameInp.value="";
-    });
+    }));
     card.appendChild(block);
   });
 
