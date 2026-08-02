@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Toddler Meal Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#faf7f2;
+    --card:#ffffff;
+    --ink:#2e2a26;
+    --muted:#8a8078;
+    --line:#ece5db;
+    --accent:#e8895a;
+    --accent-ink:#ffffff;
+    --good:#5fa777;
+    --good-bg:#e9f5ee;
+    --warn:#d98c3d;
+    --warn-bg:#fbf1e4;
+    --protein:#d97757;
+    --vegetable:#5c9e6b;
+    --fruit:#c4699a;
+    --grain:#b08a4c;
+    --fat:#6b8fc4;
+    --radius:14px;
+    --shadow:0 1px 3px rgba(40,30,20,.08), 0 1px 2px rgba(40,30,20,.05);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    padding-bottom:84px;
+    -webkit-tap-highlight-color:transparent;
+  }
+  header.top{
+    position:sticky;top:0;z-index:20;
+    background:var(--bg);
+    padding:14px 16px 10px;
+    border-bottom:1px solid var(--line);
+  }
+  header.top h1{
+    font-family:"Permanent Marker","Marker Felt","Segoe Print",cursive;
+    font-size:30px;margin:0 0 2px;font-weight:400;letter-spacing:.02em;
+    color:var(--accent);transform:rotate(-2deg);display:inline-block;
+  }
+  header.top p{margin:0;font-size:12.5px;color:var(--muted);}
+  .container{max-width:640px;margin:0 auto;padding:12px 14px 0;}
+  .card{
+    background:var(--card);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:14px;
+    margin-bottom:12px;
+  }
+  .daytabs{
+    display:flex;overflow-x:auto;gap:6px;padding:10px 14px 4px;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .daytabs::-webkit-scrollbar{display:none;}
+  .daytab{
+    flex:0 0 auto;
+    padding:8px 14px;
+    border-radius:999px;
+    background:var(--card);
+    border:1px solid var(--line);
+    font-size:13px;font-weight:600;color:var(--muted);
+    white-space:nowrap;
+  }
+  .daytab.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
+
+  nav.bottom{
+    position:fixed;bottom:0;left:0;right:0;z-index:30;
+    display:flex;background:var(--card);
+    border-top:1px solid var(--line);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  nav.bottom button{
+    flex:1;border:none;background:none;padding:10px 4px 8px;
+    font-size:11px;color:var(--muted);font-weight:600;
+    display:flex;flex-direction:column;align-items:center;gap:2px;
+  }
+  nav.bottom button .ic{font-size:19px;}
+  nav.bottom button.active{color:var(--accent);}
+
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .meal-block{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;}
+  .meal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+  .meal-head .label{font-weight:700;font-size:14.5px;}
+  .meal-head .count{font-size:11.5px;color:var(--muted);}
+  .item-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px dashed var(--line);}
+  .item-row:first-of-type{border-top:none;}
+  .item-row label{flex:1;font-size:14px;display:flex;align-items:center;gap:8px;}
+  .item-row.checked label{color:var(--muted);text-decoration:line-through;}
+  .item-row input[type=checkbox]{width:19px;height:19px;flex:0 0 auto;accent-color:var(--good);}
+  .tag-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;}
+  .qty{font-size:12px;color:var(--muted);white-space:nowrap;}
+  .icon-btn{
+    border:none;background:none;color:var(--muted);font-size:15px;padding:4px 6px;
+  }
+  .add-item-row{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;}
+  .add-item-row input, .add-item-row select{
+    font-size:13px;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;
+  }
+  .add-item-row input.name{flex:1 1 100px;min-width:90px;}
+  .add-item-row input.qty{width:64px;}
+  .add-item-row select{flex:0 0 auto;}
+  .add-item-row button{
+    border:none;background:var(--accent);color:#fff;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;
+  }
+
+  .section-title{font-size:15px;font-weight:700;margin:2px 0 8px;}
+  .subtle{font-size:12px;color:var(--muted);margin:0 0 10px;}
+
+  .cat-block{margin-bottom:14px;}
+  .cat-block h3{
+    font-size:13px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);
+    display:flex;align-items:center;gap:6px;margin:0 0 8px;
+  }
+  .chips{display:flex;flex-wrap:wrap;gap:7px;}
+  .chip{
+    border:1px solid var(--line);border-radius:999px;padding:7px 12px;font-size:13px;
+    background:#fff;color:var(--ink);display:flex;align-items:center;gap:6px;
+  }
+  .chip.covered{background:var(--good-bg);border-color:var(--good);color:#2f6b45;}
+  .chip .x{opacity:.35;font-size:12px;}
+
+  .progress-wrap{background:#f1ece3;border-radius:999px;height:9px;overflow:hidden;margin:6px 0 2px;}
+  .progress-bar{height:100%;background:var(--good);border-radius:999px;transition:width .3s;}
+  .cat-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;}
+  .cat-row .pct{font-size:12px;color:var(--muted);}
+
+  .overall-card{display:flex;align-items:center;gap:14px;}
+  .ring{position:relative;width:64px;height:64px;flex:0 0 auto;}
+  .ring svg{transform:rotate(-90deg);}
+  .ring .num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;}
+
+  .grocery-cat{margin-bottom:6px;}
+  .grocery-cat h3{font-size:13px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin:14px 0 6px;}
+  .grocery-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px dashed var(--line);}
+  .grocery-row:first-of-type{border-top:none;}
+  .grocery-row input[type=checkbox]{width:19px;height:19px;accent-color:var(--good);}
+  .grocery-row label{flex:1;font-size:14.5px;}
+  .grocery-row.checked label{color:var(--muted);text-decoration:line-through;}
+  .grocery-row .amt{font-size:12.5px;color:var(--muted);white-space:nowrap;}
+
+  .btnrow{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+  .btn{
+    border:none;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:600;
+    background:#f1ece3;color:var(--ink);
+  }
+  .btn.primary{background:var(--accent);color:#fff;}
+  .btn.danger{background:#fbeaea;color:#b6493f;}
+
+  .history-row{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-top:1px dashed var(--line);}
+  .history-row:first-of-type{border-top:none;}
+
+  .empty{font-size:13px;color:var(--muted);text-align:center;padding:18px 0;}
+  .day-add{margin-top:4px;}
+  .banner{
+    background:var(--warn-bg);color:#8a5a1f;border-radius:10px;padding:9px 11px;font-size:12.5px;margin-bottom:10px;
+  }
+  input[type=text],input[type=number]{font-family:inherit;}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1>CHICHO</h1>
+  <p id="weekLabel">Week plan · groceries · variety check</p>
+</header>
+
+<div class="container">
+
+  <!-- PLAN VIEW -->
+  <div class="view active" id="view-plan">
+    <div class="daytabs" id="dayTabs"></div>
+    <div id="dayContent"></div>
+  </div>
+
+  <!-- GROCERY VIEW -->
+  <div class="view" id="view-grocery">
+    <div class="card">
+      <div class="section-title">🛒 Grocery list for this week</div>
+      <p class="subtle">Auto-added from every meal in your plan. Check items off as you buy them, or add extras below.</p>
+      <div id="groceryList"></div>
+      <div class="add-item-row" style="margin-top:12px;">
+        <input class="name" id="extraName" type="text" placeholder="Extra item (e.g. diapers, bread)">
+        <input class="qty" id="extraQty" type="text" placeholder="qty">
+        <button onclick="addExtraGrocery()">Add</button>
+      </div>
+      <div class="btnrow">
+        <button class="btn" onclick="uncheckAllGrocery()">Uncheck all</button>
+        <button class="btn" onclick="rebuildGrocery(true)">Rebuild from plan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- VARIETY VIEW -->
+  <div class="view" id="view-variety">
+    <div class="card overall-card">
+      <div class="ring">
+        <svg width="64" height="64" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="27" fill="none" stroke="#f1ece3" stroke-width="8"></circle>
+          <circle id="ringProgress" cx="32" cy="32" r="27" fill="none" stroke="#5fa777" stroke-width="8" stroke-linecap="round"></circle>
+        </svg>
+        <div class="num" id="ringNum">0%</div>
+      </div>
+      <div>
+        <div class="section-title" style="margin:0;">Weekly variety</div>
+        <p class="subtle" style="margin:2px 0 0;">Foods marked "eaten" this week, matched against your variety checklist below. Tap a chip to mark it manually.</p>
+      </div>
+    </div>
+
+    <div class="card" id="varietyCard"></div>
+
+    <div class="card">
+      <div class="section-title">📅 Week history</div>
+      <div id="historyList"><p class="empty">Start a new week to build history.</p></div>
+    </div>
+
+    <div class="btnrow">
+      <button class="btn primary" onclick="startNewWeek()">Start new week</button>
+    </div>
+    <p class="subtle" style="text-align:center;">Starting a new week saves this week's variety score to history, then clears "eaten" and grocery checkmarks. Your meal plan itself is kept.</p>
+  </div>
+
+</div>
+
+<nav class="bottom">
+  <button class="tab-btn active" data-view="plan" onclick="switchView('plan')"><span class="ic">📋</span>Plan</button>
+  <button class="tab-btn" data-view="grocery" onclick="switchView('grocery')"><span class="ic">🛒</span>Groceries</button>
+  <button class="tab-btn" data-view="variety" onclick="switchView('variety')"><span class="ic">🌈</span>Variety</button>
+</nav>
+
+<script>
+/* ---------- category meta ---------- */
+const CATS = {
+  protein:   { label:"Proteins",          color:"var(--protein)"  },
+  vegetable: { label:"Vegetables",        color:"var(--vegetable)"},
+  fruit:     { label:"Fruits",            color:"var(--fruit)"    },
+  grain:     { label:"Grains & Starches", color:"var(--grain)"    },
+  fat:       { label:"Healthy Fats",      color:"var(--fat)"      }
+};
+
+/* ---------- default variety checklist (master foods per category) ---------- */
+const DEFAULT_VARIETY = {
+  protein:   ["Egg","Chicken","Turkey","Beef","Salmon","White fish","Lentils","Chickpeas","Tofu","Greek yogurt","Cottage cheese","Ricotta","Cheese"],
+  vegetable: ["Carrots","Sweet potato","Pumpkin","Zucchini","Green beans","Peas","Cauliflower","Potato","Cucumber","Tomato"],
+  fruit:     ["Banana","Pear","Apple","Strawberries","Blueberries","Raspberries","Mango","Peach","Kiwi","Melon"],
+  grain:     ["Oatmeal","Whole wheat toast","Whole wheat pasta","Rice","Quinoa","Potato","Sweet potato"],
+  fat:       ["Avocado","Salmon","Chia seeds","Peanut butter","Olive oil"]
+};
+
+/* item: {id, name, qty, cats:[...]} ; cats reference CATS keys, first = primary (used for grocery grouping) */
+function it(name, qty, cats){ return {id:uid(), name, qty, cats, eaten:false}; }
+function uid(){ return Math.random().toString(36).slice(2,10); }
+
+function meal(label, icon, items){ return {label, icon, items}; }
+
+function defaultPlan(){
+  return {
+    days: [
+      { name:"Monday", meals:[
+        meal("Breakfast","🍳",[it("Egg","50 g",["protein"]),it("Oatmeal","40 g",["grain"]),it("Banana","60 g",["fruit"])]),
+        meal("Snack","🧃",[it("Greek yogurt","60 g",["protein"]),it("Zucchini","40 g",["vegetable"])]),
+        meal("Lunch","🍽️",[it("Chicken","50 g",["protein"]),it("Sweet potato","70 g",["vegetable","grain"]),it("Carrots","50 g",["vegetable"])]),
+        meal("Snack","🍐",[it("Pear","60 g",["fruit"])]),
+        meal("Dinner","🌙",[it("Salmon","50 g",["protein","fat"]),it("Peas","60 g",["vegetable"]),it("Potato","60 g",["vegetable","grain"]),it("Kiwi","40 g",["fruit"])]),
+      ]},
+      { name:"Tuesday", meals:[
+        meal("Breakfast","🍓",[it("Greek yogurt","80 g",["protein"]),it("Strawberries","50 g",["fruit"]),it("Oats","20 g",["grain"])]),
+        meal("Snack","🥑",[it("Avocado","50 g",["fat"])]),
+        meal("Lunch","🍽️",[it("Lentils","60 g",["protein"]),it("Pumpkin","60 g",["vegetable"]),it("Zucchini","50 g",["vegetable"])]),
+        meal("Snack","🍑",[it("Cottage cheese","50 g",["protein"]),it("Peach","50 g",["fruit"])]),
+        meal("Dinner","🌙",[it("Turkey","50 g",["protein"]),it("Green beans","60 g",["vegetable"]),it("Whole wheat pasta","60 g",["grain"]),it("Mango","50 g",["fruit"])]),
+      ]},
+      { name:"Wednesday", meals:[
+        meal("Breakfast","🍳",[it("Egg","50 g",["protein"]),it("Avocado","40 g",["fat"]),it("Whole wheat toast","20 g",["grain"])]),
+        meal("Snack","🍎",[it("Apple purée","60 g",["fruit"])]),
+        meal("Lunch","🍽️",[it("Beef","50 g",["protein"]),it("Cauliflower","60 g",["vegetable"]),it("Potato","60 g",["vegetable","grain"])]),
+        meal("Snack","🫐",[it("Greek yogurt","60 g",["protein"]),it("Blueberries","40 g",["fruit"])]),
+        meal("Dinner","🌙",[it("Tofu","60 g",["protein"]),it("Peas","60 g",["vegetable"]),it("Quinoa","50 g",["grain"]),it("Pear","50 g",["fruit"])]),
+      ]},
+      { name:"Thursday", meals:[
+        meal("Breakfast","🥣",[it("Oatmeal","60 g",["grain"]),it("Apple","50 g",["fruit"])]),
+        meal("Snack","🧀",[it("Cheese","30 g",["protein"]),it("Cucumber","40 g",["vegetable"])]),
+        meal("Lunch","🍽️",[it("White fish","50 g",["protein"]),it("Peas","60 g",["vegetable"]),it("Carrots","50 g",["vegetable"])]),
+        meal("Snack","🍌",[it("Banana","60 g",["fruit"])]),
+        meal("Dinner","🌙",[it("Chicken","50 g",["protein"]),it("Cauliflower","60 g",["vegetable"]),it("Rice","50 g",["grain"]),it("Melon","50 g",["fruit"])]),
+      ]},
+      { name:"Friday", meals:[
+        meal("Breakfast","🥣",[it("Greek yogurt","80 g",["protein"]),it("Mango","50 g",["fruit"]),it("Chia seeds","3 g",["fat"])]),
+        meal("Snack","🥑",[it("Avocado","40 g",["fat"]),it("Tomato","30 g",["vegetable"])]),
+        meal("Lunch","🍽️",[it("Chickpeas","60 g",["protein"]),it("Zucchini","60 g",["vegetable"]),it("Sweet potato","60 g",["vegetable","grain"])]),
+        meal("Snack","🍑",[it("Cottage cheese","50 g",["protein"]),it("Raspberries","40 g",["fruit"])]),
+        meal("Dinner","🌙",[it("Beef meatballs","50 g",["protein"]),it("Green beans","60 g",["vegetable"]),it("Pasta","60 g",["grain"]),it("Peach","50 g",["fruit"])]),
+      ]},
+      { name:"Saturday", meals:[
+        meal("Breakfast","🍳",[it("Egg","50 g",["protein"]),it("Tomato","30 g",["vegetable"]),it("Whole wheat toast","20 g",["grain"])]),
+        meal("Snack","🍌",[it("Greek yogurt","60 g",["protein"]),it("Banana","40 g",["fruit"])]),
+        meal("Lunch","🍽️",[it("Salmon","50 g",["protein","fat"]),it("Pumpkin","60 g",["vegetable"]),it("Peas","50 g",["vegetable"])]),
+        meal("Snack","🍐",[it("Ricotta","40 g",["protein"]),it("Pear","50 g",["fruit"])]),
+        meal("Dinner","🌙",[it("Turkey","50 g",["protein"]),it("Carrots","60 g",["vegetable"]),it("Quinoa","50 g",["grain"]),it("Blueberries","40 g",["fruit"])]),
+      ]},
+      { name:"Sunday", meals:[
+        meal("Breakfast","🥣",[it("Oatmeal","60 g",["grain"]),it("Pear","50 g",["fruit"]),it("Peanut butter","5 g",["fat"])]),
+        meal("Snack","🧀",[it("Cheese","30 g",["protein"]),it("Avocado","40 g",["fat"])]),
+        meal("Lunch","🍽️",[it("Chicken","50 g",["protein"]),it("Green beans","60 g",["vegetable"]),it("Potato","60 g",["vegetable","grain"])]),
+        meal("Snack","🍓",[it("Greek yogurt","60 g",["protein"]),it("Strawberries","40 g",["fruit"])]),
+        meal("Dinner","🌙",[it("Lentils","60 g",["protein"]),it("Zucchini","50 g",["vegetable"]),it("Rice","50 g",["grain"]),it("Banana","50 g",["fruit"])]),
+      ]},
+    ]
+  };
+}
+
+/* ---------- state ---------- */
+const STORE_KEY = "toddlerMealPlanner.v1";
+let state = loadState();
+
+function loadState(){
+  const raw = localStorage.getItem(STORE_KEY);
+  if(raw){
+    try{ return JSON.parse(raw); }catch(e){}
+  }
+  return {
+    plan: defaultPlan(),
+    variety: JSON.parse(JSON.stringify(DEFAULT_VARIETY)),
+    manualCovered: {},   // { "protein::Salmon": true }
+    grocery: [],         // [{id,name,qty,cat,checked,manual}]
+    history: [],
+    weekStarted: new Date().toISOString().slice(0,10)
+  };
+}
+function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+
+if(!state.grocery || state.grocery.length===0){ rebuildGrocery(false); }
+
+/* ---------- view switching ---------- */
+let currentDay = 0;
+function switchView(name){
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  document.getElementById("view-"+name).classList.add("active");
+  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.toggle("active", b.dataset.view===name));
+  if(name==="grocery") renderGrocery();
+  if(name==="variety") renderVariety();
+}
+
+/* ---------- PLAN RENDER ---------- */
+function renderDayTabs(){
+  const wrap = document.getElementById("dayTabs");
+  wrap.innerHTML = "";
+  state.plan.days.forEach((d,i)=>{
+    const b = document.createElement("button");
+    b.className = "daytab" + (i===currentDay?" active":"");
+    b.textContent = d.name;
+    b.onclick = ()=>{ currentDay=i; renderDayTabs(); renderDayContent(); };
+    wrap.appendChild(b);
+  });
+}
+
+function renderDayContent(){
+  const day = state.plan.days[currentDay];
+  const wrap = document.getElementById("dayContent");
+  wrap.innerHTML = "";
+
+  day.meals.forEach((m, mi)=>{
+    const block = document.createElement("div");
+    block.className = "meal-block";
+    const eatenCount = m.items.filter(x=>x.eaten).length;
+    block.innerHTML = `<div class="meal-head">
+        <div class="label">${m.icon} ${m.label}</div>
+        <div class="count">${eatenCount}/${m.items.length} eaten</div>
+      </div>`;
+
+    m.items.forEach(item=>{
+      const row = document.createElement("div");
+      row.className = "item-row" + (item.eaten?" checked":"");
+      const dotColor = CATS[item.cats[0]]?.color || "#ccc";
+      row.innerHTML = `
+        <input type="checkbox" ${item.eaten?"checked":""} data-id="${item.id}">
+        <label><span class="tag-dot" style="background:${dotColor}"></span>${item.name}</label>
+        <span class="qty">${item.qty||""}</span>
+        <button class="icon-btn" data-del="${item.id}">✕</button>`;
+      row.querySelector("input").addEventListener("change", e=>{
+        item.eaten = e.target.checked;
+        save();
+        renderDayContent();
+      });
+      row.querySelector("[data-del]").addEventListener("click", ()=>{
+        m.items = m.items.filter(x=>x.id!==item.id);
+        save(); renderDayContent();
+      });
+      block.appendChild(row);
+    });
+
+    const addRow = document.createElement("div");
+    addRow.className = "add-item-row";
+    const catOptions = Object.entries(CATS).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join("");
+    addRow.innerHTML = `
+      <input class="name" type="text" placeholder="Food name">
+      <input class="qty" type="text" placeholder="qty (e.g. 50 g)">
+      <select>${catOptions}</select>
+      <button>Add</button>`;
+    const nameInp = addRow.querySelector(".name");
+    const qtyInp = addRow.querySelector(".qty");
+    const catSel = addRow.querySelector("select");
+    addRow.querySelector("button").addEventListener("click", ()=>{
+      const name = nameInp.value.trim();
+      if(!name) return;
+      m.items.push(it(name, qtyInp.value.trim(), [catSel.value]));
+      save(); renderDayContent();
+    });
+    block.appendChild(addRow);
+    wrap.appendChild(block);
+  });
+}
+
+/* ---------- GROCERY ---------- */
+function rebuildGrocery(userTriggered){
+  const totals = {}; // key: name lower -> {name, qty list, cat}
+  state.plan.days.forEach(day=>{
+    day.meals.forEach(m=>{
+      m.items.forEach(item=>{
+        const key = item.name.trim().toLowerCase();
+        if(!totals[key]){
+          totals[key] = { name:item.name, qtys:[], cat:item.cats[0] };
+        }
+        if(item.qty) totals[key].qtys.push(item.qty);
+      });
+    });
+  });
+  // preserve manual extras + checked state where names match
+  const prevChecked = {};
+  (state.grocery||[]).forEach(g=>{ if(g.checked) prevChecked[g.name.trim().toLowerCase()] = true; });
+  const manualExtras = (state.grocery||[]).filter(g=>g.manual);
+
+  const list = Object.values(totals).map(t=>({
+    id: uid(),
+    name: t.name,
+    qty: summarizeQty(t.qtys),
+    cat: t.cat,
+    checked: !!prevChecked[t.name.trim().toLowerCase()],
+    manual:false
+  }));
+  manualExtras.forEach(e=> list.push(e));
+  state.grocery = list;
+  save();
+  if(userTriggered) renderGrocery();
+}
+
+function summarizeQty(qtys){
+  if(qtys.length===0) return "";
+  if(qtys.length===1) return qtys[0];
+  const parsed = qtys.map(q=>{
+    const m = q.match(/^([\d.]+)\s*(\D*)$/);
+    return m ? {num:parseFloat(m[1]), unit:m[2].trim()} : null;
+  });
+  if(parsed.every(p=>p && !isNaN(p.num))){
+    const unit = parsed[0].unit;
+    if(parsed.every(p=>p.unit===unit)){
+      const total = parsed.reduce((s,p)=>s+p.num,0);
+      return `${total}${unit?(" "+unit):""} total (${qtys.length}x)`;
+    }
+  }
+  return qtys.length + "x (" + qtys.join(" + ") + ")";
+}
+
+function addExtraGrocery(){
+  const name = document.getElementById("extraName").value.trim();
+  const qty = document.getElementById("extraQty").value.trim();
+  if(!name) return;
+  state.grocery.push({id:uid(), name, qty, cat:"other", checked:false, manual:true});
+  document.getElementById("extraName").value="";
+  document.getElementById("extraQty").value="";
+  save(); renderGrocery();
+}
+
+function uncheckAllGrocery(){
+  state.grocery.forEach(g=>g.checked=false);
+  save(); renderGrocery();
+}
+
+function renderGrocery(){
+  const wrap = document.getElementById("groceryList");
+  wrap.innerHTML = "";
+  const groups = {};
+  state.grocery.forEach(g=>{
+    const key = g.cat || "other";
+    (groups[key] = groups[key]||[]).push(g);
+  });
+  const order = ["protein","vegetable","fruit","grain","fat","other"];
+  const labels = {...Object.fromEntries(Object.entries(CATS).map(([k,v])=>[k,v.label])), other:"Other"};
+
+  order.forEach(key=>{
+    if(!groups[key] || groups[key].length===0) return;
+    const cb = document.createElement("div");
+    cb.className = "grocery-cat";
+    cb.innerHTML = `<h3>${labels[key]}</h3>`;
+    groups[key].sort((a,b)=>a.name.localeCompare(b.name)).forEach(g=>{
+      const row = document.createElement("div");
+      row.className = "grocery-row" + (g.checked?" checked":"");
+      row.innerHTML = `
+        <input type="checkbox" ${g.checked?"checked":""} data-id="${g.id}">
+        <label>${g.name}</label>
+        <span class="amt">${g.qty||""}</span>
+        <button class="icon-btn" data-del="${g.id}">✕</button>`;
+      row.querySelector("input").addEventListener("change", e=>{
+        g.checked = e.target.checked; save(); renderGrocery();
+      });
+      row.querySelector("[data-del]").addEventListener("click", ()=>{
+        state.grocery = state.grocery.filter(x=>x.id!==g.id);
+        save(); renderGrocery();
+      });
+      cb.appendChild(row);
+    });
+    wrap.appendChild(cb);
+  });
+  if(state.grocery.length===0){
+    wrap.innerHTML = `<p class="empty">No items yet — add foods to your meal plan first.</p>`;
+  }
+}
+
+/* ---------- VARIETY ---------- */
+function eatenFoodNamesThisWeek(){
+  const set = new Set();
+  state.plan.days.forEach(day=>{
+    day.meals.forEach(m=>{
+      m.items.forEach(item=>{
+        if(item.eaten) set.add(item.name.trim().toLowerCase());
+      });
+    });
+  });
+  return set;
+}
+
+function isCovered(cat, food){
+  const manualKey = cat+"::"+food;
+  if(state.manualCovered[manualKey]) return true;
+  return eatenFoodNamesThisWeek().has(food.trim().toLowerCase());
+}
+
+function toggleManual(cat, food){
+  const key = cat+"::"+food;
+  if(eatenFoodNamesThisWeek().has(food.trim().toLowerCase())){
+    // it's auto-covered by an eaten item; manual toggle would only act as an "un-cover" which we don't support to avoid confusion
+    return;
+  }
+  state.manualCovered[key] = !state.manualCovered[key];
+  save(); renderVariety();
+}
+
+function renderVariety(){
+  const card = document.getElementById("varietyCard");
+  card.innerHTML = "";
+  let totalItems=0, totalCovered=0;
+  const catPct = {};
+
+  Object.entries(state.variety).forEach(([cat, foods])=>{
+    const meta = CATS[cat];
+    const block = document.createElement("div");
+    block.className = "cat-block";
+    const coveredCount = foods.filter(f=>isCovered(cat,f)).length;
+    const pct = foods.length? Math.round(100*coveredCount/foods.length) : 0;
+    catPct[cat]=pct;
+    totalItems += foods.length; totalCovered += coveredCount;
+
+    block.innerHTML = `
+      <h3><span class="tag-dot" style="background:${meta.color}"></span>${meta.label} — ${coveredCount}/${foods.length}</h3>
+      <div class="progress-wrap"><div class="progress-bar" style="width:${pct}%;background:${meta.color}"></div></div>
+      <div class="chips" style="margin-top:8px;"></div>
+      <div class="add-item-row" style="margin-top:8px;">
+        <input class="name" type="text" placeholder="Add food to ${meta.label.toLowerCase()} checklist">
+        <button>Add</button>
+      </div>`;
+    const chips = block.querySelector(".chips");
+    foods.forEach(food=>{
+      const covered = isCovered(cat, food);
+      const chip = document.createElement("div");
+      chip.className = "chip" + (covered?" covered":"");
+      chip.innerHTML = `${covered?"✓ ":""}${food} <span class="x" data-rm="${food}">✕</span>`;
+      chip.addEventListener("click", (e)=>{
+        if(e.target.dataset.rm) return;
+        toggleManual(cat, food);
+      });
+      chip.querySelector("[data-rm]").addEventListener("click",(e)=>{
+        e.stopPropagation();
+        state.variety[cat] = state.variety[cat].filter(f=>f!==food);
+        delete state.manualCovered[cat+"::"+food];
+        save(); renderVariety();
+      });
+      chips.appendChild(chip);
+    });
+    const addRow = block.querySelector(".add-item-row");
+    const nameInp = addRow.querySelector(".name");
+    addRow.querySelector("button").addEventListener("click", ()=>{
+      const v = nameInp.value.trim();
+      if(!v) return;
+      if(!state.variety[cat].some(f=>f.toLowerCase()===v.toLowerCase())){
+        state.variety[cat].push(v);
+        save(); renderVariety();
+      }
+      nameInp.value="";
+    });
+    card.appendChild(block);
+  });
+
+  const overallPct = totalItems? Math.round(100*totalCovered/totalItems) : 0;
+  const circumference = 2*Math.PI*27;
+  const ring = document.getElementById("ringProgress");
+  ring.setAttribute("stroke-dasharray", circumference);
+  ring.setAttribute("stroke-dashoffset", circumference*(1-overallPct/100));
+  document.getElementById("ringNum").textContent = overallPct+"%";
+
+  renderHistory();
+}
+
+function renderHistory(){
+  const wrap = document.getElementById("historyList");
+  if(!state.history || state.history.length===0){
+    wrap.innerHTML = `<p class="empty">Start a new week to build history.</p>`;
+    return;
+  }
+  wrap.innerHTML = "";
+  state.history.slice().reverse().forEach(h=>{
+    const row = document.createElement("div");
+    row.className = "history-row";
+    row.innerHTML = `<span>${h.weekOf}</span><span>${h.overallPct}% variety</span>`;
+    wrap.appendChild(row);
+  });
+}
+
+function startNewWeek(){
+  // compute this week's overall pct for history before clearing
+  let totalItems=0, totalCovered=0;
+  Object.entries(state.variety).forEach(([cat, foods])=>{
+    totalItems += foods.length;
+    totalCovered += foods.filter(f=>isCovered(cat,f)).length;
+  });
+  const overallPct = totalItems? Math.round(100*totalCovered/totalItems) : 0;
+  state.history.push({ weekOf: state.weekStarted, overallPct });
+
+  // reset eaten flags + manual covers + grocery checks
+  state.plan.days.forEach(day=>day.meals.forEach(m=>m.items.forEach(item=>item.eaten=false)));
+  state.manualCovered = {};
+  state.grocery.forEach(g=>g.checked=false);
+  state.weekStarted = new Date().toISOString().slice(0,10);
+
+  save();
+  renderDayContent();
+  renderGrocery();
+  renderVariety();
+  alert("New week started! Last week's variety score (" + overallPct + "%) was saved to history.");
+}
+
+/* ---------- init ---------- */
+renderDayTabs();
+renderDayContent();
+document.getElementById("weekLabel").textContent = "Week of " + state.weekStarted + " · groceries · variety check";
+</script>
+</body>
+</html>
